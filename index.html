@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="ru" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SP!DER // Streetwear Drop</title>
+    <link rel="icon" type="image/png" href="img/logo-icon.png">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Oswald:wght@500;600;700;900&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Oswald', 'sans-serif'],
+                    },
+                    colors: {
+                        spider: {
+                            bg: '#070709',
+                            card: '#0f1015',
+                            border: 'rgba(255, 255, 255, 0.08)',
+                            moss: '#6b7d4a'
+                        },
+                        // Болотная палитра бренда (вместо красного)
+                        swamp: {
+                            950: '#0d100a',
+                            900: '#161b11',
+                            800: '#222a19',
+                            700: '#2f3a23',
+                            600: '#3e4b2d',
+                            500: '#4f5f37',
+                            400: '#6b7d4a',
+                            300: '#8a9a62',
+                            200: '#b3bf8f'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --mouse-x: 50%;
+            --mouse-y: 50%;
+            --metal-x: 50%;
+            /* Металл: серебро + лёгкие болотные и стальные отливы */
+            --metal-grad: linear-gradient(105deg,
+                #5b6066 0%, #e9ecef 12%, #8f969c 22%, #dfe6cf 32%, #fafbfc 42%,
+                #737a80 52%, #c8cfe0 62%, #f2f3f5 72%, #8c9a6e 82%, #e4e7ea 92%, #6a7076 100%);
+        }
+
+        body {
+            background-color: #070709;
+            color: #f8fafc;
+            overflow-x: hidden;
+            font-family: 'Inter', sans-serif;
+        }
+
+        ::selection {
+            background: #4f5f37;
+            color: #fff;
+        }
+
+        .street-grid {
+            background-size: 50px 50px;
+            background-image:
+                linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+        }
+
+        #spotlight {
+            pointer-events: none;
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            background: radial-gradient(
+                600px circle at var(--mouse-x) var(--mouse-y),
+                rgba(255, 255, 255, 0.05),
+                rgba(107, 125, 74, 0.05) 40%,
+                transparent 80%
+            );
+            transition: opacity 0.3s ease;
+        }
+
+        @media (pointer: fine) {
+            #cursor-dot {
+                width: 7px;
+                height: 7px;
+                background-color: #ffffff;
+                border-radius: 50%;
+                position: fixed;
+                pointer-events: none;
+                z-index: 9999;
+                transform: translate(-50%, -50%);
+                box-shadow: 0 0 10px #ffffff;
+            }
+            #cursor-ring {
+                width: 32px;
+                height: 32px;
+                border: 1px solid rgba(179, 191, 143, 0.45);
+                border-radius: 50%;
+                position: fixed;
+                pointer-events: none;
+                z-index: 9998;
+                transform: translate(-50%, -50%);
+                transition: transform 0.08s linear, border-color 0.2s;
+            }
+        }
+
+        .tilt-card {
+            transform-style: preserve-3d;
+            transition: transform 0.15s ease-out, border-color 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+        }
+        .tilt-card:hover {
+            border-color: rgba(138, 154, 98, 0.4);
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.8);
+        }
+        .tilt-shine {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: radial-gradient(
+                450px circle at var(--card-mouse-x, 50%) var(--card-mouse-y, 50%),
+                rgba(255, 255, 255, 0.08),
+                transparent 60%
+            );
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .tilt-card:hover .tilt-shine {
+            opacity: 1;
+        }
+
+        .product-img-back {
+            opacity: 0;
+            transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .product-card:hover .product-img-back {
+            opacity: 1;
+        }
+
+        .glass-nav {
+            background: rgba(7, 7, 9, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(138, 154, 98, 0.15);
+        }
+
+        /* Металлическая окантовка: буквы чёрные, обводка переливается при скролле */
+        .metal-text {
+            color: #060607;
+            background-image: var(--metal-grad);
+            background-size: 300% 100%;
+            background-position: var(--metal-x) 50%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-stroke: var(--metal-stroke, 3px) transparent;
+            filter: drop-shadow(0 0 14px rgba(200, 210, 185, 0.07));
+        }
+
+        .metal-logo svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        /* Фон hero из фотосессии */
+        .hero-photo {
+            filter: grayscale(0.35) sepia(0.15) brightness(0.5) contrast(1.05);
+        }
+        .hero-photo-shade {
+            background:
+                radial-gradient(ellipse 70% 45% at 50% 30%, rgba(7, 7, 9, 0.6), rgba(7, 7, 9, 0.15) 75%),
+                linear-gradient(to bottom, rgba(7, 7, 9, 0.85) 0%, rgba(7, 7, 9, 0.15) 18%, rgba(7, 7, 9, 0.35) 62%, #070709 100%);
+        }
+        .hero-photo-tint {
+            background: #4f5f37;
+            mix-blend-mode: color;
+            opacity: 0.35;
+        }
+
+        #spider-3d-bag.mode-rotate { touch-action: pan-y; }
+        #spider-3d-bag.mode-stretch { touch-action: none; cursor: grab; }
+        #spider-3d-bag.mode-stretch:active { cursor: grabbing; }
+
+        .bag-mode-btn.active {
+            background: #8a9a62;
+            color: #070709;
+            border-color: #8a9a62;
+        }
+    </style>
+</head>
+<body class="street-grid">
+
+    <!-- Спотлайт и кастомный курсор -->
+    <div id="spotlight"></div>
+    <div id="cursor-dot" class="hidden md:block"></div>
+    <div id="cursor-ring" class="hidden md:block"></div>
+
+    <!-- HEADER: логотип вместо надписи -->
+    <header class="fixed top-0 left-0 right-0 z-50 glass-nav">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
+
+            <nav class="hidden md:flex items-center gap-7 text-xs uppercase tracking-widest font-semibold text-neutral-400 w-1/3">
+                <a href="#catalog" class="hover:text-swamp-200 transition-colors">Каталог</a>
+                <a href="#about" class="hover:text-swamp-200 transition-colors">О бренде</a>
+                <a href="#order" class="hover:text-swamp-200 transition-colors">Заказ</a>
+            </nav>
+
+            <a href="#" class="flex items-center justify-center gap-2 sm:gap-3 group shrink-0 mx-auto md:mx-0" aria-label="SP!DER">
+                <div class="metal-logo h-8 w-8 sm:h-10 sm:w-10 transition-transform group-hover:scale-105 shrink-0"
+                     data-src="img/logo-icon.png" data-w="512" data-h="479" data-stroke="16"></div>
+                <div class="metal-logo h-11 w-[64px] sm:h-14 sm:w-[81px] transition-transform group-hover:scale-105 shrink-0"
+                     data-src="img/logo-wordmark.png" data-w="1400" data-h="967" data-stroke="26"></div>
+            </a>
+
+            <div class="flex items-center justify-end gap-2 sm:gap-3 md:w-1/3">
+                <span class="hidden lg:inline-block text-[11px] font-mono uppercase tracking-widest px-3 py-1 rounded bg-swamp-950 border border-swamp-600 text-swamp-200">
+                    OFFICIAL
+                </span>
+                <a href="https://t.me/spiderclothes" target="_blank" rel="noopener noreferrer"
+                   class="p-2 sm:px-4 sm:py-2 rounded-full bg-white text-black text-xs font-bold uppercase tracking-wider hover:bg-swamp-200 transition-all flex items-center gap-1.5 shrink-0">
+                    <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                    <span class="hidden sm:inline">Telegram</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- HERO БЛОК: фото с фотосессии на фоне + логотип -->
+    <div class="relative">
+        <div class="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+            <div id="hero-bg-inner" class="absolute inset-x-0 -top-10 -bottom-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 will-change-transform">
+                <img src="img/photoshoot/img_6420.jpg" alt="" class="hero-photo hidden lg:block w-full h-full object-cover">
+                <img src="img/photoshoot/img_6421.jpg" alt="" class="hero-photo w-full h-full object-cover">
+                <img src="img/photoshoot/img_6428.jpg" alt="" class="hero-photo hidden sm:block w-full h-full object-cover">
+                <img src="img/photoshoot/img_6424.jpg" alt="" class="hero-photo w-full h-full object-cover">
+                <img src="img/photoshoot/img_6423.jpg" alt="" class="hero-photo hidden lg:block w-full h-full object-cover">
+            </div>
+            <div class="absolute inset-0 hero-photo-tint"></div>
+            <div class="absolute inset-0 hero-photo-shade"></div>
+        </div>
+
+        <main class="relative z-10 pt-24 sm:pt-32 pb-12 max-w-7xl mx-auto px-4 sm:px-6 text-center">
+            <h1 class="flex justify-center">
+                <span class="sr-only">SP!DER</span>
+                <div class="metal-logo w-[260px] h-[180px] sm:w-[420px] sm:h-[290px] lg:w-[540px] lg:h-[373px]"
+                     data-src="img/logo-wordmark.png" data-w="1400" data-h="967" data-stroke="9"></div>
+            </h1>
+
+            <p class="mt-2 sm:mt-4 max-w-2xl mx-auto text-neutral-300 text-xs sm:text-base leading-relaxed px-2">
+                Синтез агрессивной уличной эстетики и функциональной анатомической поддержки. Экипировка, созданная для бескомпромиссного движения, плотной фиксации и чистого стритвир-стиля.
+            </p>
+
+            <div class="mt-6 sm:mt-8 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+                <a href="#catalog" class="px-6 sm:px-8 py-3 rounded-full bg-white text-black font-extrabold text-xs uppercase tracking-widest hover:bg-swamp-200 transition-all">
+                    Смотреть позиции
+                </a>
+                <a href="#order" class="px-6 sm:px-8 py-3 rounded-full bg-swamp-950/80 border border-swamp-600 text-white font-bold text-xs uppercase tracking-widest hover:border-swamp-300 transition-all">
+                    Собрать заказ
+                </a>
+            </div>
+
+            <!-- 3D КОНТЕЙНЕР: АВОСЬКА SP!DER -->
+            <div class="mt-10 sm:mt-12 max-w-2xl mx-auto relative h-[360px] sm:h-[460px] rounded-3xl border border-swamp-500/30 bg-gradient-to-b from-swamp-950/60 to-black/85 backdrop-blur-[2px] flex items-center justify-center overflow-hidden">
+                <div class="absolute top-4 left-5 text-[10px] sm:text-[11px] font-mono text-neutral-400 uppercase tracking-widest flex items-center gap-2 pointer-events-none z-10">
+                    <span class="w-1.5 h-1.5 rounded-full bg-swamp-300 animate-ping"></span>
+                    SP!DER // BALL BAG
+                </div>
+                <div class="absolute top-3 right-3 z-10 flex gap-1.5 text-[10px] sm:text-[11px] font-mono uppercase tracking-wider">
+                    <button type="button" id="bag-mode-rotate" class="bag-mode-btn active px-2.5 py-1 rounded-full border border-white/15 bg-black/50 text-neutral-300 transition-all">Вращать</button>
+                    <button type="button" id="bag-mode-stretch" class="bag-mode-btn px-2.5 py-1 rounded-full border border-white/15 bg-black/50 text-neutral-300 transition-all">Тянуть</button>
+                </div>
+                <div class="absolute bottom-4 text-[11px] sm:text-xs font-mono text-neutral-400 flex items-center gap-1.5 pointer-events-none z-10">
+                    <i data-lucide="mouse-pointer" class="w-3.5 h-3.5"></i>
+                    <span id="bag-hint">Крутите авоську курсором</span>
+                </div>
+
+                <canvas id="spider-3d-bag" class="mode-rotate w-full h-full cursor-grab active:cursor-grabbing"></canvas>
+            </div>
+        </main>
+    </div>
+
+    <!-- КАТАЛОГ -->
+    <section id="catalog" class="relative z-10 py-14 max-w-7xl mx-auto px-4 sm:px-6 border-t border-neutral-900">
+        <div class="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-3">
+            <div>
+                <span class="text-xs font-mono uppercase tracking-[0.25em] text-swamp-300">LINEUP</span>
+                <h2 class="metal-text font-display font-black text-3xl sm:text-5xl uppercase tracking-wider mt-1">КАТАЛОГ</h2>
+            </div>
+            <p class="text-xs text-neutral-400 font-mono">
+                * Нажмите на карточку для быстрого просмотра
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
+
+            <!-- Позиция 1 -->
+            <div onclick="openProductModal(0)" class="tilt-card product-card bg-spider-card rounded-2xl p-4 border border-spider-border flex flex-col justify-between cursor-pointer">
+                <div class="tilt-shine"></div>
+                <div>
+                    <div class="relative w-full aspect-[4/5] rounded-xl overflow-hidden bg-neutral-900/80 mb-4 border border-white/5">
+                        <img src="https://lh3.googleusercontent.com/d/1SZ7DebnU44yLNMZUttckhgFRWu5WUF4r" alt="Белая футболка" class="absolute inset-0 w-full h-full object-cover">
+                        <img src="https://lh3.googleusercontent.com/d/1-byayItkjZgF4oDMOrf25Vn997yRR9E1" alt="Белая футболка сзади" class="product-img-back absolute inset-0 w-full h-full object-cover">
+                        <span class="absolute top-3 left-3 px-2 py-0.5 rounded bg-black/70 backdrop-blur-md border border-swamp-500/40 text-[10px] font-mono uppercase tracking-wider text-swamp-200">Short Sleeve</span>
+                    </div>
+                    <div class="text-[11px] font-mono text-neutral-400 uppercase">White Phantom</div>
+                    <h3 class="font-bold text-sm text-white mt-0.5">Белая компрессионная футболка</h3>
+                </div>
+                <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                    <span class="font-display font-bold text-lg text-white">3 790 ₽</span>
+                    <span class="px-3 py-1.5 rounded-lg bg-swamp-500/20 text-xs font-semibold text-swamp-200">Подробнее</span>
+                </div>
+            </div>
+
+            <!-- Позиция 2 -->
+            <div onclick="openProductModal(1)" class="tilt-card product-card bg-spider-card rounded-2xl p-4 border border-spider-border flex flex-col justify-between cursor-pointer">
+                <div class="tilt-shine"></div>
+                <div>
+                    <div class="relative w-full aspect-[4/5] rounded-xl overflow-hidden bg-neutral-900/80 mb-4 border border-white/5">
+                        <img src="https://lh3.googleusercontent.com/d/1_oh_R0k4ek87EO2iAgY_Cp1nYGjGvRJi" alt="Белый лонгслив" class="absolute inset-0 w-full h-full object-cover">
+                        <img src="https://lh3.googleusercontent.com/d/14_QNYektIiL9esVoNq3ADXy4CA96NAfT" alt="Белый лонгслив сзади" class="product-img-back absolute inset-0 w-full h-full object-cover">
+                        <span class="absolute top-3 left-3 px-2 py-0.5 rounded bg-black/70 backdrop-blur-md border border-swamp-500/40 text-[10px] font-mono uppercase tracking-wider text-swamp-200">Long Sleeve</span>
+                    </div>
+                    <div class="text-[11px] font-mono text-neutral-400 uppercase">White Phantom</div>
+                    <h3 class="font-bold text-sm text-white mt-0.5">Белый компрессионный лонгслив</h3>
+                </div>
+                <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                    <span class="font-display font-bold text-lg text-white">3 990 ₽</span>
+                    <span class="px-3 py-1.5 rounded-lg bg-swamp-500/20 text-xs font-semibold text-swamp-200">Подробнее</span>
+                </div>
+            </div>
+
+            <!-- Позиция 3 -->
+            <div onclick="openProductModal(2)" class="tilt-card product-card bg-spider-card rounded-2xl p-4 border border-spider-border flex flex-col justify-between cursor-pointer">
+                <div class="tilt-shine"></div>
+                <div>
+                    <div class="relative w-full aspect-[4/5] rounded-xl overflow-hidden bg-neutral-900/80 mb-4 border border-white/5">
+                        <img src="https://lh3.googleusercontent.com/d/1VvTL7QrC_bk0gZkXKMLK-GUhQEKZp1K1" alt="Камо футболка" class="absolute inset-0 w-full h-full object-cover">
+                        <img src="https://lh3.googleusercontent.com/d/17cbI5nFsgZW6JapG9Ph9kPNY-HpTs09n" alt="Камо футболка сзади" class="product-img-back absolute inset-0 w-full h-full object-cover">
+                        <span class="absolute top-3 left-3 px-2 py-0.5 rounded bg-black/70 backdrop-blur-md border border-swamp-500/40 text-[10px] font-mono uppercase tracking-wider text-swamp-200">Short Sleeve</span>
+                    </div>
+                    <div class="text-[11px] font-mono text-neutral-400 uppercase">Camo Stealth</div>
+                    <h3 class="font-bold text-sm text-white mt-0.5">Камо компрессионная футболка</h3>
+                </div>
+                <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                    <span class="font-display font-bold text-lg text-white">3 790 ₽</span>
+                    <span class="px-3 py-1.5 rounded-lg bg-swamp-500/20 text-xs font-semibold text-swamp-200">Подробнее</span>
+                </div>
+            </div>
+
+            <!-- Позиция 4 -->
+            <div onclick="openProductModal(3)" class="tilt-card product-card bg-spider-card rounded-2xl p-4 border border-spider-border flex flex-col justify-between cursor-pointer">
+                <div class="tilt-shine"></div>
+                <div>
+                    <div class="relative w-full aspect-[4/5] rounded-xl overflow-hidden bg-neutral-900/80 mb-4 border border-white/5">
+                        <img src="https://lh3.googleusercontent.com/d/1hvvby6rnhg-0c4HnSUyMKmsCEYbBwfr4" alt="Камо лонгслив" class="absolute inset-0 w-full h-full object-cover">
+                        <img src="https://lh3.googleusercontent.com/d/1c2O2IbqHuqjOZ_6K2hRHV7g6HRbflz1v" alt="Камо лонгслив сзади" class="product-img-back absolute inset-0 w-full h-full object-cover">
+                        <span class="absolute top-3 left-3 px-2 py-0.5 rounded bg-black/70 backdrop-blur-md border border-swamp-500/40 text-[10px] font-mono uppercase tracking-wider text-swamp-200">Long Sleeve</span>
+                    </div>
+                    <div class="text-[11px] font-mono text-neutral-400 uppercase">Camo Stealth</div>
+                    <h3 class="font-bold text-sm text-white mt-0.5">Камо компрессионный лонгслив</h3>
+                </div>
+                <div class="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                    <span class="font-display font-bold text-lg text-white">3 990 ₽</span>
+                    <span class="px-3 py-1.5 rounded-lg bg-swamp-500/20 text-xs font-semibold text-swamp-200">Подробнее</span>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- МОДАЛКА: ПОЛНОРАЗМЕРНОЕ ФОТО + СВОБОДНЫЙ СКРОЛЛ -->
+    <div id="product-modal" onclick="onModalBackdropClick(event)" style="display: none;" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md items-center justify-center p-2 sm:p-6 overflow-y-auto">
+        <div id="modal-container" onclick="event.stopPropagation()" class="relative w-full max-w-2xl my-auto bg-neutral-950 border border-neutral-800 rounded-3xl p-5 sm:p-8 shadow-2xl max-h-[94vh] overflow-y-auto">
+
+            <button type="button" onclick="closeProductModal()" class="sticky top-0 float-right -mt-1 -mr-1 w-9 h-9 rounded-full bg-neutral-900 border border-white/10 hover:bg-white hover:text-black text-white flex items-center justify-center transition-all z-30 shadow-lg cursor-pointer">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-start clear-both mt-1">
+
+                <div class="w-full">
+                    <div class="relative w-full aspect-[3/4] rounded-2xl overflow-hidden bg-neutral-900/90 border border-white/5 flex items-center justify-center">
+                        <img id="modal-img-front" src="" alt="Товар спереди" class="absolute inset-0 w-full h-full object-contain p-2 transition-opacity duration-300">
+                        <img id="modal-img-back" src="" alt="Товар сзади" class="absolute inset-0 w-full h-full object-contain p-2 opacity-0 transition-opacity duration-300">
+                    </div>
+                    <div class="flex gap-2.5 mt-3">
+                        <button type="button" onclick="setModalView('front')" id="btn-view-front" class="flex-1 py-2 rounded-xl bg-white text-black font-mono text-xs font-bold uppercase transition-all shadow-sm">Спереди</button>
+                        <button type="button" onclick="setModalView('back')" id="btn-view-back" class="flex-1 py-2 rounded-xl bg-white/10 text-neutral-400 font-mono text-xs font-bold uppercase hover:text-white transition-all">Со спины</button>
+                    </div>
+                </div>
+
+                <div class="space-y-4 pt-1">
+                    <div>
+                        <span id="modal-color" class="inline-block text-[11px] font-mono uppercase tracking-[0.2em] text-swamp-300">WHITE PHANTOM</span>
+                        <h3 id="modal-title" class="metal-text font-display font-black text-xl sm:text-2xl uppercase leading-tight mt-1" style="--metal-stroke: 2px">Белый компрессионный лонгслив</h3>
+                        <div id="modal-price" class="metal-text font-display font-black text-2xl mt-1.5" style="--metal-stroke: 2px">3 990 ₽</div>
+                    </div>
+
+                    <p class="text-xs text-neutral-400 leading-relaxed">
+                        Плотный анатомический крой, поддержка целевых мышечных групп и фирменный паутинный принт SP!DER на рукавах и спине.
+                    </p>
+
+                    <div>
+                        <div class="text-[11px] font-mono uppercase tracking-wider text-neutral-400 mb-2">Размер:</div>
+                        <div class="grid grid-cols-4 gap-2" id="modal-size-group">
+                            <button type="button" onclick="selectModalSize('S')" class="modal-size-btn py-2.5 rounded-xl border border-neutral-800 bg-neutral-900 font-mono text-xs font-bold hover:border-swamp-300 transition-all">S</button>
+                            <button type="button" onclick="selectModalSize('M')" class="modal-size-btn active py-2.5 rounded-xl border border-swamp-300 bg-swamp-300 text-black font-mono text-xs font-bold transition-all">M</button>
+                            <button type="button" onclick="selectModalSize('L')" class="modal-size-btn py-2.5 rounded-xl border border-neutral-800 bg-neutral-900 font-mono text-xs font-bold hover:border-swamp-300 transition-all">L</button>
+                            <button type="button" onclick="selectModalSize('XL')" class="modal-size-btn py-2.5 rounded-xl border border-neutral-800 bg-neutral-900 font-mono text-xs font-bold hover:border-swamp-300 transition-all">XL</button>
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <a id="modal-tg-btn" href="#" target="_blank" class="w-full py-4 rounded-xl bg-white text-black font-extrabold text-xs uppercase tracking-widest hover:bg-swamp-200 transition-all flex items-center justify-center gap-2 shadow-xl">
+                            <i data-lucide="send" class="w-4 h-4"></i>
+                            <span>Оформить в Telegram</span>
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- БЛОК ЗАКАЗА (КОНФИГУРАТОР) -->
+    <section id="order" class="relative z-10 py-14 max-w-4xl mx-auto px-4 sm:px-6">
+        <div class="bg-neutral-950 border border-neutral-800 rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden">
+            <div class="mb-7 pb-5 border-b border-neutral-900">
+                <span class="text-xs font-mono uppercase tracking-widest text-swamp-300">Order Builder</span>
+                <h2 class="metal-text font-display font-black text-2xl sm:text-4xl uppercase mt-1" style="--metal-stroke: 2.5px">Оформить заказ</h2>
+            </div>
+
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-xs font-mono uppercase text-neutral-400 mb-2.5">1. Выберите модель:</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="model-selector">
+                        <button type="button" data-title="Белая компрессионная футболка" data-price="3790" class="cfg-model active p-3.5 rounded-xl border border-swamp-300 bg-swamp-500/15 text-left transition-all">
+                            <div class="font-bold text-sm text-white">Белая футболка</div>
+                            <div class="text-xs text-neutral-400">Короткий рукав • 3 790 ₽</div>
+                        </button>
+                        <button type="button" data-title="Белый компрессионный лонгслив" data-price="3990" class="cfg-model p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/40 text-left hover:border-swamp-600 transition-all">
+                            <div class="font-bold text-sm text-white">Белый лонгслив</div>
+                            <div class="text-xs text-neutral-400">Длинный рукав • 3 990 ₽</div>
+                        </button>
+                        <button type="button" data-title="Камо компрессионная футболка" data-price="3790" class="cfg-model p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/40 text-left hover:border-swamp-600 transition-all">
+                            <div class="font-bold text-sm text-white">Камо футболка</div>
+                            <div class="text-xs text-neutral-400">Короткий рукав • 3 790 ₽</div>
+                        </button>
+                        <button type="button" data-title="Камо компрессионный лонгслив" data-price="3990" class="cfg-model p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/40 text-left hover:border-swamp-600 transition-all">
+                            <div class="font-bold text-sm text-white">Камо лонгслив</div>
+                            <div class="text-xs text-neutral-400">Длинный рукав • 3 990 ₽</div>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-mono uppercase text-neutral-400 mb-2.5">2. Выберите размер:</label>
+                    <div class="grid grid-cols-4 gap-2.5" id="size-selector">
+                        <button type="button" data-size="S" class="cfg-size py-3 rounded-xl border border-neutral-800 bg-neutral-900/40 font-mono font-bold text-sm text-neutral-400 hover:border-swamp-600 transition-all">S</button>
+                        <button type="button" data-size="M" class="cfg-size active py-3 rounded-xl border border-swamp-300 bg-swamp-500/15 font-mono font-bold text-sm text-white transition-all">M</button>
+                        <button type="button" data-size="L" class="cfg-size py-3 rounded-xl border border-neutral-800 bg-neutral-900/40 font-mono font-bold text-sm text-neutral-400 hover:border-swamp-600 transition-all">L</button>
+                        <button type="button" data-size="XL" class="cfg-size py-3 rounded-xl border border-neutral-800 bg-neutral-900/40 font-mono font-bold text-sm text-neutral-400 hover:border-swamp-600 transition-all">XL</button>
+                    </div>
+                </div>
+
+                <div class="pt-6 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-5">
+                    <div>
+                        <div class="text-xs text-neutral-400 font-mono">Сумма к оплате:</div>
+                        <div id="cfg-price-display" class="metal-text font-display font-black text-3xl sm:text-4xl" style="--metal-stroke: 2.5px">3 790 ₽</div>
+                        <div id="cfg-summary-display" class="text-xs text-neutral-300 mt-0.5">Белая компрессионная футболка, Размер: M</div>
+                    </div>
+
+                    <a id="tg-order-link" href="https://t.me/Ar3m_G" target="_blank" rel="noopener noreferrer"
+                       class="w-full sm:w-auto px-8 py-4 rounded-xl bg-white text-black font-extrabold text-xs uppercase tracking-widest hover:bg-swamp-200 transition-all flex items-center justify-center gap-2">
+                        <i data-lucide="send" class="w-4 h-4"></i>
+                        <span>Оформить заказ в Telegram</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+<!-- О БРЕНДЕ: Новый текст + "На рынке с 2025 года" -->
+    <section id="about" class="relative z-10 py-14 max-w-7xl mx-auto px-4 sm:px-6 border-t border-neutral-900">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+
+            <div class="tilt-card rounded-3xl bg-neutral-950 p-6 sm:p-8 border border-neutral-800 flex flex-col justify-between">
+                <div class="tilt-shine"></div>
+                <div>
+                    <span class="text-xs font-mono uppercase tracking-[0.2em] text-swamp-300">PHILOSOPHY // BRAND</span>
+                    <h2 class="metal-text font-display font-black text-2xl sm:text-4xl uppercase tracking-wider mt-1" style="--metal-stroke: 2.5px">SP!DER CULTURE</h2>
+                    <p class="mt-4 text-neutral-400 text-xs sm:text-sm leading-relaxed">
+                        SP!DER — московский стритвир-бренд, сфокусированный на бескомпромиссном качестве, дерзком визуале и функциональной экипировке. Мы разрабатываем одежду, которая объединяет плотную анатомическую посадку, износостойкость и чистую эстетику улиц. Каждая вещь создана для тех, кто ставит на характер, движение и уверенный стиль в любой ситуации.
+                    </p>
+                </div>
+                <div class="mt-6 flex flex-wrap gap-2.5 text-xs font-mono text-neutral-300">
+                    <div class="px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800"><span class="text-swamp-300">✓</span> На рынке с 2025 года</div>
+                    <div class="px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800"><span class="text-swamp-300">✓</span> Анатомическая компрессия</div>
+                    <div class="px-3.5 py-2 rounded-lg bg-neutral-900 border border-neutral-800"><span class="text-swamp-300">✓</span> Сделано в Москве</div>
+                </div>
+            </div>
+
+            <div class="tilt-card rounded-3xl bg-neutral-950 p-6 sm:p-8 border border-neutral-800 flex flex-col justify-center items-center text-center">
+                <div class="tilt-shine"></div>
+                <div class="metal-logo w-20 h-20 sm:w-24 sm:h-24 mb-4"
+                     data-src="img/logo-icon.png" data-w="512" data-h="479" data-stroke="8"></div>
+                <h3 class="metal-text font-display font-black text-2xl sm:text-3xl uppercase tracking-wider" style="--metal-stroke: 2.5px">SP!DER COMMUNITY</h3>
+                <p class="text-xs text-neutral-400 mt-2 max-w-sm leading-relaxed">
+                    Следи за анонсами уличных турниров, закрытыми дропами и тренировками создателей в официальном канале.
+                </p>
+                <a href="https://t.me/spiderclothes" target="_blank" class="mt-6 px-7 sm:px-8 py-3 rounded-full bg-white text-black hover:bg-swamp-200 text-xs font-extrabold uppercase tracking-widest transition-all flex items-center gap-2">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                    <span>Присоединиться к Community</span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="relative z-10 border-t border-neutral-900 py-8 text-center text-xs text-neutral-600 font-mono">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>© 2026 SP!DER CLOTHES. All rights reserved. Moscow.</div>
+            <div>Designed for Street Culture & Athletes</div>
+        </div>
+    </footer>
+
+    <!-- ОСНОВНОЙ СКРИПТ САЙТА -->
+    <script>
+        lucide.createIcons();
+
+        const productsData = [
+            {
+                title: 'Белая компрессионная футболка',
+                color: 'WHITE PHANTOM',
+                price: '3 790 ₽',
+                rawPrice: '3790',
+                frontImg: 'https://lh3.googleusercontent.com/d/1SZ7DebnU44yLNMZUttckhgFRWu5WUF4r',
+                backImg: 'https://lh3.googleusercontent.com/d/1-byayItkjZgF4oDMOrf25Vn997yRR9E1'
+            },
+            {
+                title: 'Белый компрессионный лонгслив',
+                color: 'WHITE PHANTOM',
+                price: '3 990 ₽',
+                rawPrice: '3990',
+                frontImg: 'https://lh3.googleusercontent.com/d/1_oh_R0k4ek87EO2iAgY_Cp1nYGjGvRJi',
+                backImg: 'https://lh3.googleusercontent.com/d/14_QNYektIiL9esVoNq3ADXy4CA96NAfT'
+            },
+            {
+                title: 'Камо компрессионная футболка',
+                color: 'CAMO STEALTH',
+                price: '3 790 ₽',
+                rawPrice: '3790',
+                frontImg: 'https://lh3.googleusercontent.com/d/1VvTL7QrC_bk0gZkXKMLK-GUhQEKZp1K1',
+                backImg: 'https://lh3.googleusercontent.com/d/17cbI5nFsgZW6JapG9Ph9kPNY-HpTs09n'
+            },
+            {
+                title: 'Камо компрессионный лонгслив',
+                color: 'CAMO STEALTH',
+                price: '3 990 ₽',
+                rawPrice: '3990',
+                frontImg: 'https://lh3.googleusercontent.com/d/1hvvby6rnhg-0c4HnSUyMKmsCEYbBwfr4',
+                backImg: 'https://lh3.googleusercontent.com/d/1c2O2IbqHuqjOZ_6K2hRHV7g6HRbflz1v'
+            }
+        ];
+
+        // Металлические логотипы: чёрный логотип + переливающаяся окантовка (SVG-маска)
+        const METAL_STOPS = [
+            [0, '#5b6066'], [0.12, '#e9ecef'], [0.22, '#8f969c'], [0.32, '#dfe6cf'], [0.42, '#fafbfc'],
+            [0.52, '#737a80'], [0.62, '#c8cfe0'], [0.72, '#f2f3f5'], [0.82, '#8c9a6e'], [0.92, '#e4e7ea'], [1, '#6a7076']
+        ];
+        document.querySelectorAll('.metal-logo').forEach((el, n) => {
+            const src = el.dataset.src;
+            const w = Number(el.dataset.w);
+            const h = Number(el.dataset.h);
+            const r = Number(el.dataset.stroke || 10);
+            const pad = r + 4;
+            const id = 'metal-logo-' + n;
+            const stops = METAL_STOPS.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('');
+            el.innerHTML = `
+                <svg viewBox="${-pad} ${-pad} ${w + pad * 2} ${h + pad * 2}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="${id}-g" class="metal-grad" x1="0" y1="0" x2="0.5" y2="0.3" spreadMethod="reflect">${stops}</linearGradient>
+                        <filter id="${id}-f" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+                            <feMorphology in="SourceAlpha" operator="dilate" radius="${r}" result="d"/>
+                            <feFlood flood-color="#ffffff"/>
+                            <feComposite in2="d" operator="in"/>
+                        </filter>
+                        <mask id="${id}-m" maskUnits="userSpaceOnUse" x="${-pad}" y="${-pad}" width="${w + pad * 2}" height="${h + pad * 2}">
+                            <image href="${src}" width="${w}" height="${h}" filter="url(#${id}-f)"/>
+                        </mask>
+                    </defs>
+                    <rect x="${-pad}" y="${-pad}" width="${w + pad * 2}" height="${h + pad * 2}" fill="url(#${id}-g)" mask="url(#${id}-m)"/>
+                    <image href="${src}" width="${w}" height="${h}"/>
+                </svg>`;
+        });
+
+        // Перелив металла и параллакс фото при скролле
+        (function () {
+            const root = document.documentElement;
+            const grads = document.querySelectorAll('.metal-grad');
+            const heroBg = document.getElementById('hero-bg-inner');
+            let target = window.scrollY;
+            let cur = target;
+            let last = -1;
+            window.addEventListener('scroll', () => { target = window.scrollY; }, { passive: true });
+
+            function tick() {
+                cur += (target - cur) * 0.1;
+                if (Math.abs(cur - last) > 0.3) {
+                    last = cur;
+                    const s = Math.sin(cur / 380);
+                    root.style.setProperty('--metal-x', (50 + 50 * s).toFixed(2) + '%');
+                    const t = (s * 0.5).toFixed(4);
+                    grads.forEach(g => g.setAttribute('gradientTransform', `translate(${t} 0)`));
+                    if (heroBg) heroBg.style.transform = `translate3d(0, ${(cur * 0.2).toFixed(1)}px, 0)`;
+                }
+                requestAnimationFrame(tick);
+            }
+            tick();
+        })();
+
+        // Кастомный курсор
+        const dot = document.getElementById('cursor-dot');
+        const ring = document.getElementById('cursor-ring');
+        window.addEventListener('mousemove', (e) => {
+            document.documentElement.style.setProperty('--mouse-x', e.clientX + 'px');
+            document.documentElement.style.setProperty('--mouse-y', e.clientY + 'px');
+            if (dot && ring) {
+                dot.style.left = e.clientX + 'px';
+                dot.style.top = e.clientY + 'px';
+                ring.style.left = e.clientX + 'px';
+                ring.style.top = e.clientY + 'px';
+            }
+        });
+
+        // 3D Tilt
+        document.querySelectorAll('.tilt-card').forEach(card => {
+            card.addEventListener('mousemove', e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const rotX = ((y - rect.height / 2) / (rect.height / 2)) * -6;
+                const rotY = ((x - rect.width / 2) / (rect.width / 2)) * 6;
+                card.style.transform = `perspective(900px) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+                card.style.setProperty('--card-mouse-x', `${x}px`);
+                card.style.setProperty('--card-mouse-y', `${y}px`);
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg)';
+            });
+        });
+
+        // Логика модального окна
+        let activeModalIndex = 0;
+        let activeModalSize = 'M';
+
+        window.openProductModal = function(index) {
+            activeModalIndex = index;
+            const p = productsData[index];
+            if (!p) return;
+
+            document.getElementById('modal-title').textContent = p.title;
+            document.getElementById('modal-color').textContent = p.color;
+            document.getElementById('modal-price').textContent = p.price;
+            document.getElementById('modal-img-front').src = p.frontImg;
+            document.getElementById('modal-img-back').src = p.backImg;
+
+            setModalView('front');
+            selectModalSize('M');
+
+            const modal = document.getElementById('product-modal');
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        };
+
+        window.closeProductModal = function() {
+            const modal = document.getElementById('product-modal');
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        };
+
+        window.onModalBackdropClick = function(event) {
+            if (event.target.id === 'product-modal') {
+                closeProductModal();
+            }
+        };
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeProductModal();
+        });
+
+        window.setModalView = function(view) {
+            const front = document.getElementById('modal-img-front');
+            const back = document.getElementById('modal-img-back');
+            const btnF = document.getElementById('btn-view-front');
+            const btnB = document.getElementById('btn-view-back');
+            if (view === 'front') {
+                front.style.opacity = '1';
+                back.style.opacity = '0';
+                btnF.className = 'flex-1 py-2 rounded-xl bg-white text-black font-mono text-xs font-bold uppercase transition-all shadow-sm';
+                btnB.className = 'flex-1 py-2 rounded-xl bg-white/10 text-neutral-400 font-mono text-xs font-bold uppercase hover:text-white transition-all';
+            } else {
+                front.style.opacity = '0';
+                back.style.opacity = '1';
+                btnB.className = 'flex-1 py-2 rounded-xl bg-white text-black font-mono text-xs font-bold uppercase transition-all shadow-sm';
+                btnF.className = 'flex-1 py-2 rounded-xl bg-white/10 text-neutral-400 font-mono text-xs font-bold uppercase hover:text-white transition-all';
+            }
+        };
+
+        window.selectModalSize = function(size) {
+            activeModalSize = size;
+            document.querySelectorAll('.modal-size-btn').forEach(b => {
+                if (b.textContent === size) {
+                    b.className = 'modal-size-btn active py-2.5 rounded-xl border border-swamp-300 bg-swamp-300 text-black font-mono text-xs font-bold transition-all';
+                } else {
+                    b.className = 'modal-size-btn py-2.5 rounded-xl border border-neutral-800 bg-neutral-900 text-neutral-300 font-mono text-xs font-bold hover:border-swamp-300 transition-all';
+                }
+            });
+            const p = productsData[activeModalIndex];
+            const msg = `Привет! Хочу оформить заказ с сайта SP!DER:\n- Позиция: ${p.title}\n- Размер: ${activeModalSize}\n- Цена: ${p.price}\nЕсть ли в наличии?`;
+            document.getElementById('modal-tg-btn').href = `https://t.me/Ar3m_G?text=${encodeURIComponent(msg)}`;
+        };
+
+        // Логика конфигуратора
+        let currentItem = {
+            title: 'Белая компрессионная футболка',
+            price: '3790',
+            size: 'M'
+        };
+
+        function updateOrderState() {
+            const priceFormatted = Number(currentItem.price).toLocaleString('ru-RU') + ' ₽';
+            document.getElementById('cfg-price-display').textContent = priceFormatted;
+            document.getElementById('cfg-summary-display').textContent = `${currentItem.title}, Размер: ${currentItem.size}`;
+
+            const text = `Привет! Хочу оформить заказ с сайта SP!DER:\n- Позиция: ${currentItem.title}\n- Размер: ${currentItem.size}\n- Цена: ${priceFormatted}\nЕсть ли в наличии?`;
+            document.getElementById('tg-order-link').href = `https://t.me/Ar3m_G?text=${encodeURIComponent(text)}`;
+        }
+
+        document.querySelectorAll('.cfg-model').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.cfg-model').forEach(b => {
+                    b.className = 'cfg-model p-3.5 rounded-xl border border-neutral-800 bg-neutral-900/40 text-left hover:border-swamp-600 transition-all';
+                });
+                btn.className = 'cfg-model active p-3.5 rounded-xl border border-swamp-300 bg-swamp-500/15 text-left transition-all';
+                currentItem.title = btn.dataset.title;
+                currentItem.price = btn.dataset.price;
+                updateOrderState();
+            });
+        });
+
+        document.querySelectorAll('.cfg-size').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.cfg-size').forEach(b => {
+                    b.className = 'cfg-size py-3 rounded-xl border border-neutral-800 bg-neutral-900/40 font-mono font-bold text-sm text-neutral-400 hover:border-swamp-600 transition-all';
+                });
+                btn.className = 'cfg-size active py-3 rounded-xl border border-swamp-300 bg-swamp-500/15 font-mono font-bold text-sm text-white transition-all';
+                currentItem.size = btn.dataset.size;
+                updateOrderState();
+            });
+        });
+
+        updateOrderState();
+    </script>
+
+    <!-- THREE.JS: АВОСЬКА SP!DER С МЯЧОМ (крутить и растягивать) -->
+    <script>
+    (function () {
+        const canvas = document.getElementById('spider-3d-bag');
+        if (!canvas || typeof THREE === 'undefined') return;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(
+            34,
+            canvas.clientWidth / canvas.clientHeight,
+            0.1,
+            100
+        );
+        camera.position.set(0, 0, 7.4);
+
+        const renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            alpha: true,
+            antialias: true,
+            powerPreference: 'high-performance'
+        });
+        // false — не прописываем canvas инлайн-размеры, размер задаёт CSS (w-full h-full)
+        renderer.setSize(canvas.clientWidth || 1, canvas.clientHeight || 1, false);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.3;
+
+        // ballGroup — наклон и парение, spinGroup — вращение пользователем
+        const ballGroup = new THREE.Group();
+        scene.add(ballGroup);
+        const spinGroup = new THREE.Group();
+        ballGroup.add(spinGroup);
+
+        const width = 2048;
+        const height = 1024;
+
+        const colorCanvas = document.createElement('canvas');
+        colorCanvas.width = width;
+        colorCanvas.height = height;
+        const cCtx = colorCanvas.getContext('2d');
+
+        const bumpCanvas = document.createElement('canvas');
+        bumpCanvas.width = width;
+        bumpCanvas.height = height;
+        const bCtx = bumpCanvas.getContext('2d');
+
+        cCtx.fillStyle = '#121316';
+        cCtx.fillRect(0, 0, width, height);
+
+        bCtx.fillStyle = '#808080';
+        bCtx.fillRect(0, 0, width, height);
+
+        // Пупырышки резины
+        const grainCount = 85000;
+        for (let i = 0; i < grainCount; i++) {
+            const x = Math.random() * width;
+            const y = Math.random() * height;
+            const r = 1.0 + Math.random() * 1.5;
+            const shade = 160 + Math.floor(Math.random() * 85);
+            bCtx.fillStyle = `rgb(${shade},${shade},${shade})`;
+            bCtx.beginPath();
+            bCtx.arc(x, y, r, 0, Math.PI * 2);
+            bCtx.fill();
+
+            if (i % 4 === 0) {
+                const cShade = 14 + Math.floor(Math.random() * 10);
+                cCtx.fillStyle = `rgb(${cShade},${cShade},${cShade + 2})`;
+                cCtx.fillRect(x, y, 2, 2);
+            }
+        }
+
+        // Швы мяча
+        function drawSeams(ctx, color, widthLine) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = widthLine;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            ctx.beginPath();
+            ctx.moveTo(0, height * 0.5);
+            ctx.lineTo(width, height * 0.5);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(width * 0.25, 0);
+            ctx.lineTo(width * 0.25, height);
+            ctx.moveTo(width * 0.75, 0);
+            ctx.lineTo(width * 0.75, height);
+            ctx.stroke();
+
+            [width * 0.25, width * 0.75].forEach(centerX => {
+                ctx.beginPath();
+                for (let t = 0; t <= 1; t += 0.005) {
+                    const angle = t * Math.PI * 2;
+                    const dx = Math.sin(angle) * (width * 0.165);
+                    const dy = Math.cos(angle) * (height * 0.34);
+                    const px = centerX + dx;
+                    const py = height * 0.5 + dy;
+                    if (t === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.stroke();
+            });
+        }
+
+        drawSeams(bCtx, '#050505', 18);
+        drawSeams(cCtx, '#030304', 14);
+
+        const bumpTex = new THREE.CanvasTexture(bumpCanvas);
+        bumpTex.wrapS = THREE.ClampToEdgeWrapping;
+        bumpTex.wrapT = THREE.ClampToEdgeWrapping;
+
+        const colorTex = new THREE.CanvasTexture(colorCanvas);
+        colorTex.wrapS = THREE.ClampToEdgeWrapping;
+        colorTex.wrapT = THREE.ClampToEdgeWrapping;
+
+        const RADIUS = 1.0;
+        const ballGeo = new THREE.SphereGeometry(RADIUS, 96, 96);
+        const ballMat = new THREE.MeshStandardMaterial({
+            map: colorTex,
+            bumpMap: bumpTex,
+            bumpScale: 0.04,
+            roughness: 0.72,
+            metalness: 0.12
+        });
+        const basketballMesh = new THREE.Mesh(ballGeo, ballMat);
+        spinGroup.add(basketballMesh);
+
+        // Логотип и надпись на мяче
+        const logoPromise = new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(null);
+            img.src = 'img/logo-icon.png';
+        });
+
+        Promise.all([document.fonts.ready, logoPromise]).then(([_, logoImg]) => {
+            const centerX = width * 0.5;
+
+            if (logoImg) {
+                try {
+                    const tempCanvas = document.createElement('canvas');
+                    const tW = logoImg.naturalWidth || 500;
+                    const tH = logoImg.naturalHeight || 500;
+                    tempCanvas.width = tW;
+                    tempCanvas.height = tH;
+                    const tCtx = tempCanvas.getContext('2d');
+                    tCtx.drawImage(logoImg, 0, 0);
+
+                    const imgData = tCtx.getImageData(0, 0, tW, tH);
+                    const d = imgData.data;
+                    for (let i = 0; i < d.length; i += 4) {
+                        const lum = (d[i] + d[i + 1] + d[i + 2]) / 3;
+                        if (lum > 180 || d[i + 3] < 10) {
+                            d[i + 3] = 0;
+                        } else {
+                            d[i] = 255;
+                            d[i + 1] = 255;
+                            d[i + 2] = 255;
+                            d[i + 3] = Math.min(d[i + 3], 255 - lum);
+                        }
+                    }
+                    tCtx.putImageData(imgData, 0, 0);
+
+                    const s = 145;
+                    cCtx.drawImage(tempCanvas, centerX - s / 2, height * 0.22 - s / 2, s, s * tH / tW);
+                } catch (e) {
+                    // при открытии через file:// canvas может быть "tainted" — просто пропускаем логотип
+                }
+            }
+
+            cCtx.save();
+            cCtx.font = '900 82px "Oswald", sans-serif';
+            cCtx.textAlign = 'center';
+            cCtx.textBaseline = 'middle';
+            cCtx.fillStyle = '#ffffff';
+            cCtx.fillText('SP!DER', centerX, height * 0.38);
+
+            cCtx.font = '700 22px "Inter", sans-serif';
+            cCtx.fillStyle = '#8a9a62';
+            cCtx.fillText('OFFICIAL DROP', centerX, height * 0.445);
+            cCtx.restore();
+
+            colorTex.needsUpdate = true;
+        });
+
+        // ---------- Авоська: сетка из узлов на пружинах ----------
+        const NET_R = RADIUS + 0.035;
+        const NU = 24;
+        const NV = 12;
+        const parts = [];
+        const links = [];
+
+        function addPart(v, k) {
+            parts.push({ p: v.clone(), prev: v.clone(), rest: v.clone(), k: k });
+            return parts.length - 1;
+        }
+        function addLink(a, b, cord) {
+            links.push({ a: a, b: b, len: parts[a].rest.distanceTo(parts[b].rest), cord: cord });
+        }
+
+        // Профиль сетки: обтягивает мяч снизу, сверху стягивается в горловину
+        function rowProfile(j) {
+            const sphereRows = NV - 2;
+            if (j < sphereRows) {
+                const th = -1.27 + (j / (sphereRows - 1)) * (0.62 + 1.27);
+                return { r: NET_R * Math.cos(th), y: NET_R * Math.sin(th) };
+            }
+            return j === NV - 2 ? { r: 0.45, y: 1.13 } : { r: 0.13, y: 1.36 };
+        }
+
+        const grid = [];
+        for (let j = 0; j < NV; j++) {
+            const { r, y } = rowProfile(j);
+            grid[j] = [];
+            for (let i = 0; i < NU; i++) {
+                const u = (i + 0.5 * (j % 2)) / NU * Math.PI * 2;
+                grid[j][i] = addPart(new THREE.Vector3(Math.cos(u) * r, y, Math.sin(u) * r), 0.03);
+            }
+        }
+        const knotCount = parts.length;
+
+        // Ромбовидное плетение
+        for (let j = 0; j < NV - 1; j++) {
+            for (let i = 0; i < NU; i++) {
+                if (j % 2 === 0) {
+                    addLink(grid[j][i], grid[j + 1][(i - 1 + NU) % NU], false);
+                    addLink(grid[j][i], grid[j + 1][i], false);
+                } else {
+                    addLink(grid[j][i], grid[j + 1][i], false);
+                    addLink(grid[j][i], grid[j + 1][(i + 1) % NU], false);
+                }
+            }
+        }
+        // Нижнее кольцо и затяжка горловины
+        for (let i = 0; i < NU; i++) {
+            addLink(grid[0][i], grid[0][(i + 1) % NU], false);
+            addLink(grid[NV - 1][i], grid[NV - 1][(i + 1) % NU], true);
+        }
+
+        // Две ручки-петли крест-накрест
+        [[0, 1.05], [NU / 4, 0.92]].forEach(([i0, H]) => {
+            const a = grid[NV - 1][i0];
+            const b = grid[NV - 1][(i0 + NU / 2) % NU];
+            const base = parts[a].rest;
+            const dir = new THREE.Vector3(base.x, 0, base.z).normalize();
+            const M = 16;
+            let prevIdx = a;
+            for (let m = 1; m < M; m++) {
+                const s = m / M;
+                const spread = Math.cos(Math.PI * s) * (0.13 + 0.24 * Math.sin(Math.PI * s));
+                const v = dir.clone().multiplyScalar(spread);
+                v.y = base.y + Math.sin(Math.PI * s) * H;
+                const idx = addPart(v, 0.025);
+                addLink(prevIdx, idx, true);
+                prevIdx = idx;
+            }
+            addLink(prevIdx, b, true);
+        });
+
+        const cordMat = new THREE.MeshStandardMaterial({ color: 0xd9ddcc, roughness: 0.5, metalness: 0.35 });
+        const segMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true), cordMat, links.length);
+        const knotMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), cordMat, knotCount);
+        segMesh.frustumCulled = false;
+        knotMesh.frustumCulled = false;
+        spinGroup.add(segMesh);
+        spinGroup.add(knotMesh);
+
+        const UP = new THREE.Vector3(0, 1, 0);
+        const m4 = new THREE.Matrix4();
+        const q4 = new THREE.Quaternion();
+        const s3 = new THREE.Vector3();
+        const mid = new THREE.Vector3();
+        const dirV = new THREE.Vector3();
+        const tmp = new THREE.Vector3();
+
+        function syncNet() {
+            for (let k = 0; k < links.length; k++) {
+                const l = links[k];
+                const a = parts[l.a].p;
+                const b = parts[l.b].p;
+                dirV.subVectors(b, a);
+                const len = dirV.length() || 1e-6;
+                mid.addVectors(a, b).multiplyScalar(0.5);
+                q4.setFromUnitVectors(UP, dirV.multiplyScalar(1 / len));
+                const t = l.cord ? 0.02 : 0.011;
+                s3.set(t, len, t);
+                m4.compose(mid, q4, s3);
+                segMesh.setMatrixAt(k, m4);
+            }
+            q4.identity();
+            s3.setScalar(0.02);
+            for (let n = 0; n < knotCount; n++) {
+                m4.compose(parts[n].p, q4, s3);
+                knotMesh.setMatrixAt(n, m4);
+            }
+            segMesh.instanceMatrix.needsUpdate = true;
+            knotMesh.instanceMatrix.needsUpdate = true;
+        }
+
+        let grabbed = -1;
+        const grabTarget = new THREE.Vector3();
+
+        function simulate() {
+            for (let n = 0; n < parts.length; n++) {
+                if (n === grabbed) continue;
+                const q = parts[n];
+                tmp.subVectors(q.p, q.prev).multiplyScalar(0.9);
+                q.prev.copy(q.p);
+                q.p.add(tmp);
+                q.p.addScaledVector(tmp.subVectors(q.rest, q.p), q.k);
+            }
+            if (grabbed >= 0) {
+                const g = parts[grabbed];
+                g.prev.copy(g.p);
+                g.p.lerp(grabTarget, 0.5);
+            }
+            for (let it = 0; it < 8; it++) {
+                for (let k = 0; k < links.length; k++) {
+                    const l = links[k];
+                    const A = parts[l.a].p;
+                    const B = parts[l.b].p;
+                    tmp.subVectors(B, A);
+                    const d = tmp.length() || 1e-6;
+                    // мягкая связь — сетка тянется и пружинит обратно
+                    const diff = (d - l.len) / d * 0.5 * 0.6;
+                    if (l.a !== grabbed) A.addScaledVector(tmp, diff);
+                    if (l.b !== grabbed) B.addScaledVector(tmp, -diff);
+                }
+                for (let n = 0; n < parts.length; n++) {
+                    const q = parts[n].p;
+                    const d = q.length();
+                    if (d < NET_R) q.multiplyScalar(NET_R / Math.max(d, 1e-6));
+                }
+            }
+        }
+
+        // Свет
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
+        scene.add(ambientLight);
+
+        const rimLightWhite = new THREE.SpotLight(0xffffff, 3.6);
+        rimLightWhite.position.set(-4, 5, 4);
+        rimLightWhite.penumbra = 0.8;
+        scene.add(rimLightWhite);
+
+        const swampAccentLight = new THREE.PointLight(0x6b7d4a, 3.2, 12);
+        swampAccentLight.position.set(4, -3, 3);
+        scene.add(swampAccentLight);
+
+        const frontLight = new THREE.DirectionalLight(0xffffff, 0.85);
+        frontLight.position.set(0, 1, 5);
+        scene.add(frontLight);
+
+        const BASE_Y = -0.62;
+        ballGroup.position.y = BASE_Y;
+        spinGroup.rotation.set(0.12, 0, 0.05);
+
+        // Интерактив: режимы "Вращать" и "Тянуть"
+        let mode = 'rotate';
+        const btnRotate = document.getElementById('bag-mode-rotate');
+        const btnStretch = document.getElementById('bag-mode-stretch');
+        const hint = document.getElementById('bag-hint');
+        function setMode(m) {
+            mode = m;
+            btnRotate.classList.toggle('active', m === 'rotate');
+            btnStretch.classList.toggle('active', m === 'stretch');
+            canvas.classList.toggle('mode-rotate', m === 'rotate');
+            canvas.classList.toggle('mode-stretch', m === 'stretch');
+            hint.textContent = m === 'rotate' ? 'Крутите авоську курсором' : 'Хватайте сетку и тяните';
+        }
+        btnRotate.addEventListener('click', () => setMode('rotate'));
+        btnStretch.addEventListener('click', () => setMode('stretch'));
+
+        let isDragging = false;
+        let prevX = 0;
+        let prevY = 0;
+        let velX = 0.005;
+        let velY = 0;
+        let hoverX = 0;
+        let hoverY = 0;
+
+        const raycaster = new THREE.Raycaster();
+        const ndc = new THREE.Vector2();
+        const plane = new THREE.Plane();
+        const camDir = new THREE.Vector3();
+        const hit = new THREE.Vector3();
+        const wp = new THREE.Vector3();
+
+        function pickPart(e) {
+            const rect = canvas.getBoundingClientRect();
+            scene.updateMatrixWorld();
+            let best = -1;
+            let bestZ = Infinity;
+            for (let n = 0; n < parts.length; n++) {
+                wp.copy(parts[n].p);
+                spinGroup.localToWorld(wp);
+                wp.project(camera);
+                const sx = (wp.x + 1) / 2 * rect.width;
+                const sy = (1 - wp.y) / 2 * rect.height;
+                const dx = sx - (e.clientX - rect.left);
+                const dy = sy - (e.clientY - rect.top);
+                // из близких к пальцу узлов берём ближайший к камере
+                if (dx * dx + dy * dy < 34 * 34 && wp.z < bestZ) {
+                    bestZ = wp.z;
+                    best = n;
+                }
+            }
+            return best;
+        }
+
+        function updateGrabTarget(e) {
+            const rect = canvas.getBoundingClientRect();
+            ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+            raycaster.setFromCamera(ndc, camera);
+            if (!raycaster.ray.intersectPlane(plane, hit)) return;
+            spinGroup.worldToLocal(hit);
+            const rest = parts[grabbed].rest;
+            tmp.subVectors(hit, rest);
+            if (tmp.length() > 1.4) tmp.setLength(1.4);
+            grabTarget.copy(rest).add(tmp);
+        }
+
+        canvas.addEventListener('pointerdown', (e) => {
+            if (mode === 'stretch') {
+                const n = pickPart(e);
+                if (n >= 0) {
+                    grabbed = n;
+                    wp.copy(parts[n].p);
+                    spinGroup.localToWorld(wp);
+                    camera.getWorldDirection(camDir);
+                    plane.setFromNormalAndCoplanarPoint(camDir, wp);
+                    updateGrabTarget(e);
+                    canvas.setPointerCapture(e.pointerId);
+                    return;
+                }
+            }
+            isDragging = true;
+            prevX = e.clientX;
+            prevY = e.clientY;
+        });
+
+        window.addEventListener('pointerup', () => {
+            isDragging = false;
+            grabbed = -1;
+        });
+        window.addEventListener('pointercancel', () => {
+            isDragging = false;
+            grabbed = -1;
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (grabbed >= 0) {
+                updateGrabTarget(e);
+                return;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const inside = (
+                e.clientX >= rect.left && e.clientX <= rect.right &&
+                e.clientY >= rect.top && e.clientY <= rect.bottom
+            );
+
+            if (isDragging) {
+                const dx = e.clientX - prevX;
+                const dy = e.clientY - prevY;
+                velX = dx * 0.004;
+                velY = dy * 0.004;
+                prevX = e.clientX;
+                prevY = e.clientY;
+            } else if (inside) {
+                hoverX = ((e.clientY - rect.top) / rect.height - 0.5) * 0.3;
+                hoverY = ((e.clientX - rect.left) / rect.width - 0.5) * 0.3;
+            }
+        });
+
+        let isVisible = true;
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => { isVisible = entry.isIntersecting; });
+        }, { threshold: 0.05 });
+        observer.observe(canvas);
+
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!isVisible) return;
+
+            const elapsed = clock.getElapsedTime();
+
+            if (grabbed >= 0) {
+                velX *= 0.8;
+                velY *= 0.8;
+            } else if (!isDragging) {
+                velX += (0.0045 - velX) * 0.05;
+                velY += (0 - velY) * 0.05;
+            }
+
+            spinGroup.rotation.y += velX;
+            // наклон ограничен, чтобы авоська не переворачивалась
+            spinGroup.rotation.x = Math.max(-0.7, Math.min(0.7, spinGroup.rotation.x + velY));
+            if (!isDragging) spinGroup.rotation.x += (0.12 - spinGroup.rotation.x) * 0.02;
+
+            if (grabbed < 0) {
+                ballGroup.rotation.x += (hoverX - ballGroup.rotation.x) * 0.05;
+                ballGroup.rotation.y += (hoverY - ballGroup.rotation.y) * 0.05;
+            }
+            ballGroup.position.y = BASE_Y + Math.sin(elapsed * 1.8) * 0.05;
+
+            simulate();
+            syncNet();
+            renderer.render(scene, camera);
+        }
+        syncNet();
+        animate();
+
+        let resizeTimeout;
+        function safeResize() {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                const parent = canvas.parentElement;
+                if (!parent) return;
+                const w = parent.clientWidth;
+                const h = parent.clientHeight;
+                if (w === 0 || h === 0) return;
+                camera.aspect = w / h;
+                // на узких экранах отодвигаем камеру, чтобы авоська влезала
+                camera.position.z = w / h < 1 ? 7.4 / Math.max(w / h, 0.7) : 7.4;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h, false);
+            }, 60);
+        }
+        window.addEventListener('resize', safeResize, { passive: true });
+        if ('ResizeObserver' in window) new ResizeObserver(safeResize).observe(canvas.parentElement);
+        safeResize();
+    })();
+    </script>
+</body>
+</html>
