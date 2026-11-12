@@ -1031,7 +1031,7 @@
         renderer.setSize(canvas.clientWidth || 1, canvas.clientHeight || 1, false);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.3;
+        renderer.toneMappingExposure = 0.95;
 
         // ballGroup — наклон и парение, spinGroup — вращение пользователем
         const ballGroup = new THREE.Group();
@@ -1052,8 +1052,8 @@
         bumpCanvas.height = height;
         const bCtx = bumpCanvas.getContext('2d');
 
-        // серый мяч, как на фото авоськи
-        cCtx.fillStyle = '#5e6064';
+        // оранжевый баскетбольный мяч, как на фото авоськи (photosavoska/for3d.jpg)
+        cCtx.fillStyle = '#a8461a';
         cCtx.fillRect(0, 0, width, height);
 
         bCtx.fillStyle = '#808080';
@@ -1073,7 +1073,7 @@
 
             if (i % 4 === 0) {
                 const cShade = 80 + Math.floor(Math.random() * 25);
-                cCtx.fillStyle = `rgb(${cShade},${cShade},${cShade + 2})`;
+                cCtx.fillStyle = `rgb(${cShade + 95},${cShade + 10},${cShade - 50})`;
                 cCtx.fillRect(x, y, 2, 2);
             }
         }
@@ -1114,7 +1114,7 @@
         }
 
         drawSeams(bCtx, '#050505', 18);
-        drawSeams(cCtx, '#2a2b2e', 14);
+        drawSeams(cCtx, '#141414', 12);
 
         const bumpTex = new THREE.CanvasTexture(bumpCanvas);
         bumpTex.wrapS = THREE.ClampToEdgeWrapping;
@@ -1128,7 +1128,6 @@
         const ballGeo = new THREE.SphereGeometry(RADIUS, 96, 96);
         const ballMat = new THREE.MeshStandardMaterial({
             map: colorTex,
-            color: 0x9a9a9a,
             bumpMap: bumpTex,
             bumpScale: 0.04,
             roughness: 0.72,
@@ -1137,63 +1136,7 @@
         const basketballMesh = new THREE.Mesh(ballGeo, ballMat);
         spinGroup.add(basketballMesh);
 
-        // Логотип и надпись на мяче
-        const logoPromise = new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => resolve(img);
-            img.onerror = () => resolve(null);
-            img.src = ASSETS['img/logo-icon.png'];
-        });
-
-        Promise.all([document.fonts.ready, logoPromise]).then(([_, logoImg]) => {
-            const centerX = width * 0.5;
-
-            if (logoImg) {
-                try {
-                    const tempCanvas = document.createElement('canvas');
-                    const tW = logoImg.naturalWidth || 500;
-                    const tH = logoImg.naturalHeight || 500;
-                    tempCanvas.width = tW;
-                    tempCanvas.height = tH;
-                    const tCtx = tempCanvas.getContext('2d');
-                    tCtx.drawImage(logoImg, 0, 0);
-
-                    const imgData = tCtx.getImageData(0, 0, tW, tH);
-                    const d = imgData.data;
-                    for (let i = 0; i < d.length; i += 4) {
-                        const lum = (d[i] + d[i + 1] + d[i + 2]) / 3;
-                        if (lum > 180 || d[i + 3] < 10) {
-                            d[i + 3] = 0;
-                        } else {
-                            d[i] = 40;
-                            d[i + 1] = 41;
-                            d[i + 2] = 44;
-                            d[i + 3] = Math.min(d[i + 3], 255 - lum);
-                        }
-                    }
-                    tCtx.putImageData(imgData, 0, 0);
-
-                    const s = 145;
-                    cCtx.drawImage(tempCanvas, centerX - s / 2, height * 0.22 - s / 2, s, s * tH / tW);
-                } catch (e) {
-                    // при открытии через file:// canvas может быть "tainted" — просто пропускаем логотип
-                }
-            }
-
-            cCtx.save();
-            cCtx.font = '900 82px "Oswald", sans-serif';
-            cCtx.textAlign = 'center';
-            cCtx.textBaseline = 'middle';
-            cCtx.fillStyle = '#2f3033';
-            cCtx.fillText('SP!DER', centerX, height * 0.38);
-
-            cCtx.font = '700 22px "Inter", sans-serif';
-            cCtx.fillStyle = '#3e4b2d';
-            cCtx.fillText('OFFICIAL DROP', centerX, height * 0.445);
-            cCtx.restore();
-
-            colorTex.needsUpdate = true;
-        });
+        // на фото товара мяч без надписей — логотип на мяч не рисуем
 
         // ---------- Авоська: сетка из узлов на пружинах ----------
         const NET_R = RADIUS + 0.045;
@@ -1208,84 +1151,108 @@
             links.push({ a: a, b: b, len: parts[a].rest.distanceTo(parts[b].rest), cord: cord });
         }
 
-        // Паутина как у настоящей авоськи: центр спереди снизу, лучи + кольца вокруг него
+        // Сетка по фото товара (photosavoska/for3d.jpg): паутина с центром прямо спереди,
+        // такая же сзади, по краю мяча общий обод, от верхней половины обода шнуры к карабину
         const SPOKES = 16;
-        const RINGS = 11;
-        const RING_STEP = 0.21;
-        const webAxis = new THREE.Vector3(0, -0.62, 0.78).normalize();
-        const axU = new THREE.Vector3(1, 0, 0);
-        const axV = new THREE.Vector3().crossVectors(webAxis, axU).normalize();
-        function webPoint(theta, phi) {
-            return webAxis.clone().multiplyScalar(Math.cos(theta))
-                .addScaledVector(axU, Math.cos(phi) * Math.sin(theta))
-                .addScaledVector(axV, Math.sin(phi) * Math.sin(theta))
-                .multiplyScalar(NET_R);
+        const RINGS = 8;
+        // лучи сдвинуты на полшага — два из них идут вверх симметрично ("лесенка" над центром)
+        const spokeAngle = j => (j + 0.5) / SPOKES * Math.PI * 2;
+        function webPoint(side, theta, psi) {
+            return new THREE.Vector3(
+                Math.cos(psi) * Math.sin(theta),
+                Math.sin(psi) * Math.sin(theta),
+                side * Math.cos(theta)
+            ).multiplyScalar(NET_R);
         }
 
-        const centerIdx = addPart(webAxis.clone().multiplyScalar(NET_R), 0.03);
-        const web = [];
-        for (let k = 0; k < RINGS; k++) {
-            web[k] = [];
-            for (let j = 0; j < SPOKES; j++) {
-                web[k][j] = addPart(webPoint((k + 1) * RING_STEP, j / SPOKES * Math.PI * 2), 0.03);
-            }
-        }
-        for (let j = 0; j < SPOKES; j++) {
-            addLink(centerIdx, web[0][j], false);
-            for (let k = 0; k < RINGS; k++) {
-                if (k < RINGS - 1) addLink(web[k][j], web[k + 1][j], false);
-                addLink(web[k][j], web[k][(j + 1) % SPOKES], false);
-            }
-        }
+        // обод по краю мяча — общий для передней и задней паутины
+        const rim = [];
+        for (let j = 0; j < SPOKES; j++) rim[j] = addPart(webPoint(1, Math.PI / 2, spokeAngle(j)), 0.03);
+        for (let j = 0; j < SPOKES; j++) addLink(rim[j], rim[(j + 1) % SPOKES], false);
 
-        // Сверху: 8 шнуров сходятся в пучок к карабину, между ними перемычки-"лесенка"
-        const CORDS = SPOKES / 2;
-        const CHAIN = 6;
-        const hookIdx = addPart(new THREE.Vector3(0, 2.05, -0.25), 0.25);
-        const chains = [];
-        for (let c = 0; c < CORDS; c++) {
-            const a = web[RINGS - 1][c * 2];
-            const b = web[RINGS - 1][c * 2 + 1];
-            const start = parts[a].rest.clone().add(parts[b].rest).multiplyScalar(0.5);
-            start.setLength(NET_R + 0.06);
-            const hook = parts[hookIdx].rest;
-            chains[c] = [];
-            for (let m = 0; m < CHAIN; m++) {
-                const s = m / CHAIN;
-                const v = start.clone().lerp(hook, s);
-                // чуть разводим шнуры, чтобы пучок не слипался в одну линию
-                v.x += (start.x - hook.x) * 0.12 * Math.sin(Math.PI * s);
-                v.z += (start.z - hook.z) * 0.12 * Math.sin(Math.PI * s);
-                chains[c][m] = addPart(v, 0.03);
-                if (m === 0) {
-                    addLink(a, chains[c][0], true);
-                    addLink(b, chains[c][0], true);
-                } else {
-                    addLink(chains[c][m - 1], chains[c][m], true);
+        const centerIdxs = new Set();
+        [1, -1].forEach(side => {
+            const center = addPart(webPoint(side, 0, 0), 0.03);
+            centerIdxs.add(center);
+            const web = [];
+            for (let k = 0; k < RINGS - 1; k++) {
+                web[k] = [];
+                for (let j = 0; j < SPOKES; j++) {
+                    web[k][j] = addPart(webPoint(side, (k + 1) / RINGS * Math.PI / 2, spokeAngle(j)), 0.03);
                 }
             }
-            addLink(chains[c][CHAIN - 1], hookIdx, true);
+            web[RINGS - 1] = rim;
+            for (let j = 0; j < SPOKES; j++) {
+                addLink(center, web[0][j], false);
+                for (let k = 0; k < RINGS - 1; k++) {
+                    addLink(web[k][j], web[k + 1][j], false);
+                    addLink(web[k][j], web[k][(j + 1) % SPOKES], false);
+                }
+            }
+        });
+
+        // Сверху: 8 шнуров от верхней половины обода сходятся в пучок к карабину
+        const CHAIN = 7;
+        const hookIdx = addPart(new THREE.Vector3(0, 1.8, 0), 0.25);
+        const chains = [];
+        for (let c = 0; c < SPOKES / 2; c++) {
+            const start = parts[rim[c]].rest;
+            const hook = parts[hookIdx].rest;
+            chains[c] = [];
+            let prevIdx = rim[c];
+            for (let m = 1; m < CHAIN; m++) {
+                const s = m / CHAIN;
+                const v = start.clone().lerp(hook, s);
+                // шнуры слегка выгнуты наружу, как у висящей сетки
+                v.x += start.x * 0.18 * Math.sin(Math.PI * s);
+                chains[c][m] = addPart(v, 0.03);
+                addLink(prevIdx, chains[c][m], true);
+                prevIdx = chains[c][m];
+            }
+            addLink(prevIdx, hookIdx, true);
         }
-        for (let c = 0; c < CORDS; c++) {
-            [1, 2].forEach(m => addLink(chains[c][m], chains[(c + 1) % CORDS][m], true));
-        }
+        // "лесенка": две перемычки над мячом между центральными шнурами
+        [1, 2].forEach(m => addLink(chains[SPOKES / 4 - 1][m], chains[SPOKES / 4][m], true));
         const knotCount = parts.length;
 
-        const cordMat = new THREE.MeshStandardMaterial({ color: 0x030304, roughness: 0.85, metalness: 0.0 });
-        const segMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 8, 1, true), cordMat, links.length);
+        // плетёный шнур: косичка ("ёлочка") в bump-текстуре, чтобы ловила блики как на фото
+        const braidCanvas = document.createElement('canvas');
+        braidCanvas.width = 64;
+        braidCanvas.height = 64;
+        const brCtx = braidCanvas.getContext('2d');
+        brCtx.fillStyle = '#000';
+        brCtx.fillRect(0, 0, 64, 64);
+        brCtx.strokeStyle = '#fff';
+        brCtx.lineWidth = 9;
+        brCtx.lineCap = 'round';
+        for (let y = -16; y < 80; y += 16) {
+            brCtx.beginPath();
+            brCtx.moveTo(0, y);
+            brCtx.lineTo(32, y + 12);
+            brCtx.lineTo(64, y);
+            brCtx.stroke();
+        }
+        const braidTex = new THREE.CanvasTexture(braidCanvas);
+        braidTex.wrapS = THREE.RepeatWrapping;
+        braidTex.wrapT = THREE.RepeatWrapping;
+        braidTex.repeat.set(2, 3);
+
+        const cordMat = new THREE.MeshStandardMaterial({ color: 0x040404, roughness: 0.78, metalness: 0.0 });
+        const braidMat = new THREE.MeshStandardMaterial({ color: 0x040404, roughness: 0.78, metalness: 0.0, bumpMap: braidTex, bumpScale: 0.008 });
+        const segMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 10, 1, true), braidMat, links.length);
         const knotMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), cordMat, knotCount);
         segMesh.frustumCulled = false;
         knotMesh.frustumCulled = false;
         spinGroup.add(segMesh);
         spinGroup.add(knotMesh);
 
-        // Чёрный карабин с муфтой
-        const carabinerMat = new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.3, metalness: 0.85 });
-        const carabiner = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.026, 12, 40), carabinerMat);
-        carabiner.scale.set(1, 1.9, 1);
-        const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.13, 16), carabinerMat);
-        sleeve.position.set(0.13, 0.02, 0);
-        sleeve.scale.y = 1 / 1.9;
+        // Чёрный матовый вытянутый карабин с муфтой справа, как на фото
+        const carabinerMat = new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.45, metalness: 0.7 });
+        const carabiner = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.022, 12, 48), carabinerMat);
+        carabiner.scale.set(1, 2.4, 1);
+        const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.14, 16), carabinerMat);
+        sleeve.position.set(0.085, -0.01, 0);
+        sleeve.scale.y = 1 / 2.4;
         carabiner.add(sleeve);
         spinGroup.add(carabiner);
 
@@ -1306,21 +1273,21 @@
                 const len = dirV.length() || 1e-6;
                 mid.addVectors(a, b).multiplyScalar(0.5);
                 q4.setFromUnitVectors(UP, dirV.multiplyScalar(1 / len));
-                const t = l.cord ? 0.03 : 0.027;
+                const t = l.cord ? 0.032 : 0.03;
                 s3.set(t, len, t);
                 m4.compose(mid, q4, s3);
                 segMesh.setMatrixAt(k, m4);
             }
             q4.identity();
             for (let n = 0; n < knotCount; n++) {
-                s3.setScalar(n === centerIdx ? 0.07 : 0.03);
+                s3.setScalar(centerIdxs.has(n) ? 0.07 : 0.034);
                 m4.compose(parts[n].p, q4, s3);
                 knotMesh.setMatrixAt(n, m4);
             }
             segMesh.instanceMatrix.needsUpdate = true;
             knotMesh.instanceMatrix.needsUpdate = true;
             carabiner.position.copy(parts[hookIdx].p);
-            carabiner.position.y += 0.2;
+            carabiner.position.y += 0.22;
         }
 
         let grabbed = -1;
@@ -1369,7 +1336,7 @@
         rimLightWhite.penumbra = 0.8;
         scene.add(rimLightWhite);
 
-        const swampAccentLight = new THREE.PointLight(0x6b7d4a, 3.2, 12);
+        const swampAccentLight = new THREE.PointLight(0x6b7d4a, 1.2, 12);
         swampAccentLight.position.set(4, -3, 3);
         scene.add(swampAccentLight);
 
@@ -1382,9 +1349,9 @@
         backRimLight.position.set(0, 3, -5);
         scene.add(backRimLight);
 
-        const BASE_Y = -0.62;
+        const BASE_Y = -0.4;
         ballGroup.position.y = BASE_Y;
-        spinGroup.rotation.set(0.12, 0, 0.05);
+        spinGroup.rotation.set(0.04, 0, 0);
 
         // Интерактив: режимы "Вращать" и "Тянуть"
         let mode = 'rotate';
@@ -1528,7 +1495,7 @@
             spinGroup.rotation.y += velX;
             // наклон ограничен, чтобы авоська не переворачивалась
             spinGroup.rotation.x = Math.max(-0.7, Math.min(0.7, spinGroup.rotation.x + velY));
-            if (!isDragging) spinGroup.rotation.x += (0.12 - spinGroup.rotation.x) * 0.02;
+            if (!isDragging) spinGroup.rotation.x += (0.04 - spinGroup.rotation.x) * 0.02;
 
             if (grabbed < 0) {
                 ballGroup.rotation.x += (hoverX - ballGroup.rotation.x) * 0.05;
