@@ -1151,68 +1151,78 @@
             links.push({ a: a, b: b, len: parts[a].rest.distanceTo(parts[b].rest), cord: cord });
         }
 
-        // Сетка по фото товара (photosavoska/for3d.jpg): паутина с центром прямо спереди,
-        // такая же сзади, по краю мяча общий обод, от верхней половины обода шнуры к карабину
+        // Сетка по видео товара (photosavoska/IMG_9918.MOV) и фото for3d.jpg:
+        // ОДНА паутина, центр спереди ниже середины мяча; лучи огибают мяч целиком (под низом и по спине),
+        // кольца на спине видны горизонтальными полосами; наверху сзади лучи попарно сливаются в "Y"
+        // и уходят шнурами к карабину
         const SPOKES = 16;
-        const RINGS = 8;
-        // лучи сдвинуты на полшага — два из них идут вверх симметрично ("лесенка" над центром)
+        const RINGS = 12;
+        const RING_STEP = 0.2;
+        const webAxis = new THREE.Vector3(0, -0.24, 0.97).normalize();
+        const axU = new THREE.Vector3(1, 0, 0);
+        const axV = new THREE.Vector3().crossVectors(webAxis, axU).normalize(); // "вверх" по поверхности
+        // лучи сдвинуты на полшага — два из них идут вверх симметрично ("лесенка" над центром, как на фото)
         const spokeAngle = j => (j + 0.5) / SPOKES * Math.PI * 2;
-        function webPoint(side, theta, psi) {
-            return new THREE.Vector3(
-                Math.cos(psi) * Math.sin(theta),
-                Math.sin(psi) * Math.sin(theta),
-                side * Math.cos(theta)
-            ).multiplyScalar(NET_R);
+        function webPoint(theta, psi, r = NET_R) {
+            return webAxis.clone().multiplyScalar(Math.cos(theta))
+                .addScaledVector(axU, Math.cos(psi) * Math.sin(theta))
+                .addScaledVector(axV, Math.sin(psi) * Math.sin(theta))
+                .multiplyScalar(r);
         }
 
-        // обод по краю мяча — общий для передней и задней паутины
-        const rim = [];
-        for (let j = 0; j < SPOKES; j++) rim[j] = addPart(webPoint(1, Math.PI / 2, spokeAngle(j)), 0.03);
-        for (let j = 0; j < SPOKES; j++) addLink(rim[j], rim[(j + 1) % SPOKES], false);
-
-        const centerIdxs = new Set();
-        [1, -1].forEach(side => {
-            const center = addPart(webPoint(side, 0, 0), 0.03);
-            centerIdxs.add(center);
-            const web = [];
-            for (let k = 0; k < RINGS - 1; k++) {
-                web[k] = [];
-                for (let j = 0; j < SPOKES; j++) {
-                    web[k][j] = addPart(webPoint(side, (k + 1) / RINGS * Math.PI / 2, spokeAngle(j)), 0.03);
-                }
+        // Каждый луч идёт по мячу, пока не дойдёт до верхней "шапки" (y > TOP_CUT) —
+        // там сетка собирается: лучи спереди короче, лучи из-под низа поднимаются по спине
+        const TOP_CUT = 0.72;
+        const centerIdx = addPart(webPoint(0, 0), 0.03);
+        const web = [];
+        const spokeEnd = [];
+        for (let j = 0; j < SPOKES; j++) {
+            web[j] = [];
+            for (let k = 0; k < RINGS; k++) {
+                const v = webPoint((k + 1) * RING_STEP, spokeAngle(j));
+                if (v.y > TOP_CUT * NET_R) break;
+                web[j][k] = addPart(v, 0.03);
+                addLink(k === 0 ? centerIdx : web[j][k - 1], web[j][k], false);
             }
-            web[RINGS - 1] = rim;
-            for (let j = 0; j < SPOKES; j++) {
-                addLink(center, web[0][j], false);
-                for (let k = 0; k < RINGS - 1; k++) {
-                    addLink(web[k][j], web[k + 1][j], false);
-                    addLink(web[k][j], web[k][(j + 1) % SPOKES], false);
-                }
+            spokeEnd[j] = web[j][web[j].length - 1];
+        }
+        // кольца паутины — только между соседними лучами, которые ещё не ушли в "шапку"
+        for (let j = 0; j < SPOKES; j++) {
+            const next = (j + 1) % SPOKES;
+            for (let k = 0; k < RINGS; k++) {
+                if (web[j][k] !== undefined && web[next][k] !== undefined) addLink(web[j][k], web[next][k], false);
             }
-        });
+            // верхнее кольцо по краю "шапки", где сетка собирается
+            addLink(spokeEnd[j], spokeEnd[next], true);
+        }
 
-        // Сверху: 8 шнуров от верхней половины обода сходятся в пучок к карабину
-        const CHAIN = 7;
+        // Наверху: соседние лучи сливаются в "Y", дальше 8 шнуров сходятся в пучок к карабину
+        const CHAIN = 6;
         const hookIdx = addPart(new THREE.Vector3(0, 1.8, 0), 0.25);
-        const chains = [];
+        const hook = parts[hookIdx].rest;
         for (let c = 0; c < SPOKES / 2; c++) {
-            const start = parts[rim[c]].rest;
-            const hook = parts[hookIdx].rest;
-            chains[c] = [];
-            let prevIdx = rim[c];
+            const a = spokeEnd[2 * c];
+            const b = spokeEnd[2 * c + 1];
+            const fork = parts[a].rest.clone().add(parts[b].rest).multiplyScalar(0.5);
+            fork.setLength(NET_R + 0.03).lerp(hook, 0.12);
+            const forkIdx = addPart(fork, 0.03);
+            addLink(a, forkIdx, true);
+            addLink(b, forkIdx, true);
+            const start = parts[forkIdx].rest;
+            let prevIdx = forkIdx;
             for (let m = 1; m < CHAIN; m++) {
                 const s = m / CHAIN;
                 const v = start.clone().lerp(hook, s);
                 // шнуры слегка выгнуты наружу, как у висящей сетки
-                v.x += start.x * 0.18 * Math.sin(Math.PI * s);
-                chains[c][m] = addPart(v, 0.03);
-                addLink(prevIdx, chains[c][m], true);
-                prevIdx = chains[c][m];
+                v.x += start.x * 0.2 * Math.sin(Math.PI * s);
+                v.z += start.z * 0.2 * Math.sin(Math.PI * s);
+                const idx = addPart(v, 0.03);
+                addLink(prevIdx, idx, true);
+                prevIdx = idx;
             }
             addLink(prevIdx, hookIdx, true);
         }
-        // "лесенка": две перемычки над мячом между центральными шнурами
-        [1, 2].forEach(m => addLink(chains[SPOKES / 4 - 1][m], chains[SPOKES / 4][m], true));
+        const centerIdxs = new Set([centerIdx]);
         const knotCount = parts.length;
 
         // плетёный шнур: косичка ("ёлочка") в bump-текстуре, чтобы ловила блики как на фото
